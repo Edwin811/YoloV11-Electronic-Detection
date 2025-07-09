@@ -175,7 +175,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('YOLOv8 Float32 (Offline)')),
+      appBar: AppBar(title: Text('YOLOv11 Float32 (Offline)')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
