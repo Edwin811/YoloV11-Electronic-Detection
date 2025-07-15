@@ -125,6 +125,10 @@ class _HomePageState extends State<HomePage> {
     final numAnchors = outputTensor[0].length;
     final numClasses = outputTensor.length - 5;
 
+    // Simpan deteksi dengan confidence tertinggi
+    double highestConf = 0.0;
+    Map<String, dynamic>? bestBox;
+
     for (int i = 0; i < numAnchors; i++) {
       double conf = outputTensor[4][i]; // ambil confidence
 
@@ -153,17 +157,29 @@ class _HomePageState extends State<HomePage> {
         final x2 = (cx + w / 2) * 416;
         final y2 = (cy + h / 2) * 416;
 
-        boxes.add({
-          "class": classId,
-          "label": label,
-          "confidence": conf,
-          "box": [x1, y1, x2, y2],
-        });
+        // Cek apakah ini deteksi dengan confidence tertinggi
+        if (conf > highestConf) {
+          highestConf = conf;
+          bestBox = {
+            "class": classId,
+            "label": label,
+            "confidence": conf,
+            "box": [x1, y1, x2, y2],
+          };
+        }
 
         print(
           "🎯 Deteksi [$i]: $label, conf: ${(conf * 100).toStringAsFixed(1)}%",
         );
       }
+    }
+
+    // Tambahkan hanya deteksi terbaik ke daftar boxes
+    if (bestBox != null) {
+      boxes.add(bestBox);
+      print(
+        "🥇 Deteksi terbaik: ${bestBox["label"]}, conf: ${(bestBox["confidence"] * 100).toStringAsFixed(1)}%",
+      );
     }
 
     print("🔍 Total box valid: ${boxes.length}");
