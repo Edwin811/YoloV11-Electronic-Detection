@@ -48,9 +48,9 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> pickImage() async {
+  Future<void> pickImage({required ImageSource source}) async {
     try {
-      final picked = await picker.pickImage(source: ImageSource.gallery);
+      final picked = await picker.pickImage(source: source);
       if (picked != null) {
         print("📷 Gambar dipilih: ${picked.path}");
         final bytes = await picked.readAsBytes();
@@ -125,12 +125,11 @@ class _HomePageState extends State<HomePage> {
     final numAnchors = outputTensor[0].length;
     final numClasses = outputTensor.length - 5;
 
-    // Simpan deteksi dengan confidence tertinggi
+    int bestIdx = -1;
     double highestConf = 0.0;
-    Map<String, dynamic>? bestBox;
 
     for (int i = 0; i < numAnchors; i++) {
-      double conf = outputTensor[4][i]; // ambil confidence
+      double conf = outputTensor[4][i];
 
       if (conf > confThreshold) {
         double cx = outputTensor[0][i];
@@ -157,34 +156,31 @@ class _HomePageState extends State<HomePage> {
         final x2 = (cx + w / 2) * 416;
         final y2 = (cy + h / 2) * 416;
 
-        // Cek apakah ini deteksi dengan confidence tertinggi
+        boxes.add({
+          "class": classId,
+          "label": label,
+          "confidence": conf,
+          "box": [x1, y1, x2, y2],
+        });
+
         if (conf > highestConf) {
           highestConf = conf;
-          bestBox = {
-            "class": classId,
-            "label": label,
-            "confidence": conf,
-            "box": [x1, y1, x2, y2],
-          };
+          bestIdx = boxes.length - 1;
         }
 
         print(
-          "🎯 Deteksi [$i]: $label, conf: ${(conf * 100).toStringAsFixed(1)}%",
+          "🎯 Deteksi [${i}]: $label, conf: ${(conf * 100).toStringAsFixed(1)}%",
         );
       }
     }
 
-    // Tambahkan hanya deteksi terbaik ke daftar boxes
-    if (bestBox != null) {
-      boxes.add(bestBox);
-      print(
-        "🥇 Deteksi terbaik: ${bestBox["label"]}, conf: ${(bestBox["confidence"] * 100).toStringAsFixed(1)}%",
-      );
-    }
-
     print("🔍 Total box valid: ${boxes.length}");
     setState(() {
-      _boxes = boxes;
+      _boxes = boxes.map((b) => Map<String, dynamic>.from(b)).toList();
+      // Tandai index terbaik
+      if (bestIdx >= 0 && _boxes.isNotEmpty) {
+        _boxes[bestIdx]['best'] = true;
+      }
     });
   }
 
@@ -196,7 +192,14 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            ElevatedButton(onPressed: pickImage, child: Text('Pilih Gambar')),
+            ElevatedButton(
+              onPressed: () => pickImage(source: ImageSource.gallery),
+              child: Text('Pilih Gambar dari Galeri'),
+            ),
+            ElevatedButton(
+              onPressed: () => pickImage(source: ImageSource.camera),
+              child: Text('Ambil Gambar dari Kamera'),
+            ),
             if (_selectedImage != null) ...[
               SizedBox(height: 20),
               SizedBox(
@@ -212,6 +215,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                     ..._boxes.map((b) {
                       final box = b['box'];
+                      final isBest = b['best'] == true;
                       return Positioned(
                         left: box[0].clamp(0, 416),
                         top: box[1].clamp(0, 416),
@@ -219,13 +223,19 @@ class _HomePageState extends State<HomePage> {
                         height: (box[3] - box[1]).clamp(0, 416),
                         child: Container(
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.red, width: 2),
+                            border: Border.all(
+                              color: isBest ? Colors.green : Colors.red,
+                              width: isBest ? 3 : 2,
+                            ),
                           ),
                           child: Text(
                             "${b['label']} ${(b['confidence'] * 100).toStringAsFixed(1)}%",
                             style: TextStyle(
                               color: Colors.white,
-                              backgroundColor: Colors.red.withOpacity(0.7),
+                              backgroundColor:
+                                  isBest
+                                      ? Colors.green.withOpacity(0.7)
+                                      : Colors.red.withOpacity(0.7),
                               fontSize: 12,
                             ),
                           ),
